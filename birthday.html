@@ -1,0 +1,528 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <title>Surprise 🎉</title>
+  <style>
+    :root{
+      --bg1:#ffecd2;
+      --bg2:#fcb69f;
+      --card:#ffffffee;
+      --accent:#ff4d6d;
+      --accent2:#6d28d9;
+      --shadow: 0 18px 50px rgba(0,0,0,.18);
+      --radius: 22px;
+      --letterText: #000000;
+    }
+
+    *{ box-sizing:border-box; }
+    html,body{ height:100%; }
+
+    body{
+      margin:0;
+      min-height: 100svh;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Apple Color Emoji","Segoe UI Emoji";
+      background: radial-gradient(1200px 800px at 20% 20%, #fff7ed 0%, transparent 55%),
+                  radial-gradient(1000px 700px at 80% 30%, #fde2f3 0%, transparent 55%),
+                  linear-gradient(135deg, var(--bg1), var(--bg2));
+      overflow-x:hidden;
+    }
+
+    /* Confetti canvas sits on top */
+    #confetti{
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 50;
+    }
+
+    .wrap{
+      min-height: 100svh;
+      display:flex;
+      flex-direction: column;
+      align-items:center;
+      justify-content:center;
+      gap: 18px;
+      padding:
+        calc(24px + env(safe-area-inset-top))
+        16px
+        calc(40px + env(safe-area-inset-bottom));
+      position: relative;
+    }
+
+    .btn{
+      appearance:none;
+      border: none;
+      cursor:pointer;
+      border-radius: 999px;
+      padding: 14px 22px;
+      font-size: 16px;
+      font-weight: 800;
+      color: white;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      box-shadow: 0 12px 24px rgba(255, 77, 109, .25);
+      transition: transform .12s ease, filter .12s ease;
+      user-select:none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn:hover{ transform: translateY(-1px); filter: brightness(1.03); }
+    .btn:active{ transform: translateY(0px) scale(.99); }
+    .btn:focus-visible{ outline: 3px solid rgba(109,40,217,.35); outline-offset: 3px; }
+    .btn.small{ padding: 12px 20px; font-size: 15px; }
+
+    /* Holds the peeking minion + the card so the minion can sit behind the card */
+    .stack{
+      position: relative;
+      width: min(720px, 92vw);
+    }
+
+    /* Peeking minion: behind the card, with only the bottom ~25% covered */
+    .minion{
+      position: absolute;
+      top: 0;
+      right: 18px;
+      width: clamp(96px, 22vw, 180px);
+      height: auto;
+      z-index: 1; /* behind the card */
+      pointer-events: none;
+      user-select: none;
+      transform: translateY(-75%);
+      filter: drop-shadow(0 14px 24px rgba(0,0,0,.22));
+    }
+
+    .card{
+      width: 100%;
+      background: var(--card);
+      border: 1px solid rgba(255,255,255,.6);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: clamp(16px, 3.6vw, 22px);
+      position: relative;
+      z-index: 2; /* above the peeking minion */
+      backdrop-filter: blur(8px);
+
+      /* hidden animation state */
+      opacity: 0;
+      transform: translateY(10px);
+      transition: opacity .35s ease, transform .35s ease;
+    }
+    .card.show{ opacity: 1; transform: translateY(0); }
+
+    .letter{
+      border-radius: 18px;
+      background: rgba(255,255,255,.75);
+      border: 1px solid rgba(0,0,0,.06);
+      position: relative;
+      overflow:hidden;
+      padding: clamp(14px, 3vw, 18px);
+    }
+
+    .letter:before{
+      content:"";
+      position:absolute;
+      inset:-80px;
+      background:
+        radial-gradient(circle at 20% 20%, rgba(255,77,109,.25), transparent 45%),
+        radial-gradient(circle at 80% 30%, rgba(109,40,217,.18), transparent 46%),
+        radial-gradient(circle at 55% 85%, rgba(34,197,94,.18), transparent 45%);
+      transform: rotate(8deg);
+      z-index:0;
+    }
+
+    .letter-inner{
+      position: relative;
+      z-index: 1;
+      display:flex;
+      flex-direction: column;
+    }
+
+    /* Text fills the whole form */
+    .letter-content{ width: 100%; }
+
+    /* Second minion under the letter (no overlap) */
+    .under-art{
+      width: 100%;
+      display:flex;
+      justify-content:flex-end;
+      margin-top: 14px;
+    }
+
+    .minion2{
+      width: clamp(140px, 46vw, 260px);
+      max-width: 260px;
+      height: auto;
+      pointer-events: none;
+      user-select: none;
+      filter: drop-shadow(0 14px 24px rgba(0,0,0,.20));
+    }
+
+    .letter h2{
+      margin:0 0 8px;
+      font-size: clamp(20px, 4.8vw, 24px);
+      color: var(--letterText);
+    }
+
+    .letter p{
+      margin: 10px 0 0;
+      line-height: 1.65;
+      font-size: clamp(15px, 3.8vw, 16px);
+      color: var(--letterText);
+    }
+
+    .sig{
+      margin-top: 16px;
+      font-weight: 800;
+      color: var(--letterText);
+    }
+
+    /* Last row, centered */
+    .actions{
+      margin-top: 18px;
+      display:flex;
+      justify-content:center;
+    }
+
+    /* Video modal */
+    .modal{
+      position: fixed;
+      inset: 0;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:
+        calc(16px + env(safe-area-inset-top))
+        14px
+        calc(16px + env(safe-area-inset-bottom));
+      background: rgba(0,0,0,.55);
+      z-index: 60;
+    }
+    .modal[hidden]{ display:none; }
+
+    .modal-card{
+      width: min(920px, 100%);
+      background: rgba(255,255,255,.92);
+      border: 1px solid rgba(255,255,255,.55);
+      border-radius: 20px;
+      box-shadow: 0 18px 60px rgba(0,0,0,.35);
+      overflow:hidden;
+      position: relative;
+    }
+
+    .modal-top{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      padding: 12px 12px 10px;
+      border-bottom: 1px solid rgba(0,0,0,.08);
+      color: #000;
+      font-weight: 800;
+    }
+
+    .close{
+      appearance:none;
+      border: none;
+      cursor: pointer;
+      background: rgba(0,0,0,.06);
+      border-radius: 999px;
+      padding: 10px 12px;
+      font-weight: 900;
+      color: #000;
+      line-height: 1;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .video-wrap{ padding: 12px; }
+
+    video{
+      width: 100%;
+      max-height: min(70svh, 520px);
+      border-radius: 16px;
+      background: #000;
+      display:block;
+    }
+
+    .hint{
+      margin: 10px 2px 0;
+      font-size: 14px;
+      color: #000;
+      opacity: .75;
+    }
+
+    /* Phones (Android + iPhone) */
+    @media (max-width: 430px){
+      .stack{ width: 94vw; }
+      .minion{ right: 10px; transform: translateY(-70%); width: clamp(92px, 24vw, 150px); }
+      .minion2{ max-width: 210px; }
+
+      /* On tiny screens, center the image under the text */
+      .under-art{ justify-content:center; }
+    }
+
+    /* Small heights (landscape) */
+    @media (max-height: 450px) and (orientation: landscape){
+      .wrap{
+        justify-content:flex-start;
+        gap: 12px;
+        padding:
+          calc(14px + env(safe-area-inset-top))
+          14px
+          calc(14px + env(safe-area-inset-bottom));
+      }
+      video{ max-height: 58svh; }
+    }
+  </style>
+</head>
+
+<body>
+  <canvas id="confetti"></canvas>
+
+  <div class="wrap">
+    <!-- START: only this button is visible -->
+    <button class="btn" id="surpriseBtn">Surprise</button>
+
+    <!-- Minions + letter appear after clicking Surprise -->
+    <div class="stack" id="stack" hidden>
+      <!-- Peeking minion (behind the card) -->
+      <img class="minion" id="minionImg" alt="Minion" />
+
+      <main class="card" id="card" aria-live="polite">
+        <section class="letter" aria-label="Birthday letter">
+          <div class="letter-inner">
+            <div class="letter-content">
+              <h2>Happy Birthday, <span id="toName">Friend</span>! 🎉</h2>
+
+             <p id="para1">
+                Welll welll welll you are now finally 21 years old. Finally my bob is getting older and getting closer to becoming a narni ma.
+              </p>
+
+              <p id="para2">
+                I hope you get more mature too and smarter in calculating maths😏. Also I hope you get taller but wait u cannot be taller than me.
+              </p>
+
+              <p id="para3">
+                But ik this is a special day for you. So I hope this day is very special with my wish and hope the happiness you have in this day exceed all the sorrow and grief you had throughout all year. May Allah keep you healthy miss Oo atat pauk and safe. 😌✨
+              </p>
+
+
+              <p id="para4">
+                Make dua. Eat da cake. Be a little extra. And if anyone tries to ruin your vibe today,
+                just tell me. 😌✨
+              </p>
+
+              <div class="sig" id="fromLine">— From someone cheering for you 🫶</div>
+            </div>
+
+            <!-- ✅ Second minion goes UNDER the letter text (no mixing) -->
+            <div class="under-art">
+              <img class="minion2" id="minion2Img" alt="Minion" />
+            </div>
+
+            <!-- Last row, centered: Click button -->
+            <div class="actions">
+              <button class="btn small" id="videoBtn">Click</button>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <!-- Video modal (hidden until you click the Click button) -->
+  <div class="modal" id="videoModal" hidden role="dialog" aria-modal="true" aria-label="Video">
+    <div class="modal-card">
+      <div class="modal-top">
+        <div>🎬 Video</div>
+        <button class="close" id="closeModal" aria-label="Close">✕</button>
+      </div>
+      <div class="video-wrap">
+        <video id="videoPlayer" controls playsinline></video>
+        <div class="hint" id="videoHint" hidden>
+          Set <b>VIDEO_SRC</b> in the script (for example: <b>"video.mp4"</b>) so your 3:47 video plays.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /***********************
+     * Quick customization *
+     ***********************/
+    const RECIPIENT_NAME = "Bobbb!!!";      // <-- change this
+    const FROM_LINE = "— From: ur dear Yaqububu ❤️";   // <-- change this
+
+    // 1) Peeking minion PNG (behind the card)
+    const MINION_SRC = "bob1.png";
+
+    // 2) Second minion PNG (under the letter)
+    const MINION2_SRC = "bob2.png";
+
+    // Put your 3:47 video file here
+    const VIDEO_SRC = "minions.mp4";
+
+    // Optional: edit letter paragraphs here
+    const P1 = null;
+    const P2 = null;
+    const P3 = null;
+
+    /***********************
+     * UI + confetti logic *
+     ***********************/
+    const btn = document.getElementById("surpriseBtn");
+    const stack = document.getElementById("stack");
+    const card = document.getElementById("card");
+    const toName = document.getElementById("toName");
+    const fromLine = document.getElementById("fromLine");
+
+    const minionImg = document.getElementById("minionImg");
+    const minion2Img = document.getElementById("minion2Img");
+
+    const videoBtn = document.getElementById("videoBtn");
+    const videoModal = document.getElementById("videoModal");
+    const closeModal = document.getElementById("closeModal");
+    const videoPlayer = document.getElementById("videoPlayer");
+    const videoHint = document.getElementById("videoHint");
+
+    // Apply custom text
+    toName.textContent = RECIPIENT_NAME;
+    fromLine.textContent = FROM_LINE;
+
+    if (P1) document.getElementById("para1").textContent = P1;
+    if (P2) document.getElementById("para2").textContent = P2;
+    if (P3) document.getElementById("para3").textContent = P3;
+
+    // Minion images
+    if (MINION_SRC) minionImg.src = MINION_SRC;
+    else minionImg.style.display = "none";
+
+    if (MINION2_SRC) minion2Img.src = MINION2_SRC;
+    else minion2Img.style.display = "none";
+
+    btn.addEventListener("click", () => {
+      if (stack.hidden) {
+        stack.hidden = false;
+        requestAnimationFrame(() => card.classList.add("show"));
+      }
+      burstConfetti(180);
+    });
+
+    function openVideo() {
+      videoModal.hidden = false;
+
+      if (!VIDEO_SRC) {
+        videoHint.hidden = false;
+        videoPlayer.removeAttribute("src");
+        videoPlayer.load();
+      } else {
+        videoHint.hidden = true;
+        videoPlayer.src = VIDEO_SRC;
+        videoPlayer.currentTime = 0;
+        videoPlayer.play().catch(() => {});
+      }
+    }
+
+    function closeVideo() {
+      videoModal.hidden = true;
+      videoPlayer.pause();
+      videoPlayer.currentTime = 0;
+    }
+
+    videoBtn.addEventListener("click", openVideo);
+    closeModal.addEventListener("click", closeVideo);
+
+    videoModal.addEventListener("click", (e) => {
+      if (e.target === videoModal) closeVideo();
+    });
+
+    window.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && !videoModal.hidden) closeVideo();
+    });
+
+    // --- Confetti (no libraries) ---
+    const canvas = document.getElementById("confetti");
+    const ctx = canvas.getContext("2d");
+    const particles = [];
+    let animId = null;
+
+    function resize() {
+      canvas.width = Math.floor(window.innerWidth * devicePixelRatio);
+      canvas.height = Math.floor(window.innerHeight * devicePixelRatio);
+      canvas.style.width = window.innerWidth + "px";
+      canvas.style.height = window.innerHeight + "px";
+      ctx.setTransform(1,0,0,1,0,0);
+      ctx.scale(devicePixelRatio, devicePixelRatio);
+    }
+    window.addEventListener("resize", resize, { passive: true });
+    resize();
+
+    function rand(min, max) { return Math.random() * (max - min) + min; }
+
+    function burstConfetti(count = 150) {
+      const centerX = window.innerWidth / 2;
+      const centerY = window.innerHeight * 0.25;
+
+      for (let i = 0; i < count; i++) {
+        particles.push({
+          x: centerX + rand(-40, 40),
+          y: centerY + rand(-20, 20),
+          vx: rand(-6, 6),
+          vy: rand(-10, -3),
+          g: rand(0.18, 0.32),
+          size: rand(4, 8),
+          rot: rand(0, Math.PI),
+          vr: rand(-0.18, 0.18),
+          life: rand(70, 120),
+          shape: Math.random() < 0.2 ? "circle" : "rect",
+          color: `hsl(${Math.floor(rand(0, 360))} 90% 60%)`
+        });
+      }
+
+      if (!animId) animate();
+    }
+
+    function animate() {
+      animId = requestAnimationFrame(animate);
+      ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.vy += p.g;
+        p.x += p.vx;
+        p.y += p.vy;
+        p.rot += p.vr;
+        p.life -= 1;
+
+        p.vx *= 0.99;
+        p.vy *= 0.99;
+
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rot);
+        ctx.fillStyle = p.color;
+
+        if (p.shape === "circle") {
+          ctx.beginPath();
+          ctx.arc(0, 0, p.size * 0.55, 0, Math.PI * 2);
+          ctx.fill();
+        } else {
+          ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.8);
+        }
+
+        ctx.restore();
+
+        if (p.life <= 0 || p.y > window.innerHeight + 60) {
+          particles.splice(i, 1);
+        }
+      }
+
+      if (particles.length === 0) {
+        cancelAnimationFrame(animId);
+        animId = null;
+        ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+      }
+    }
+  </script>
+</body>
+</html>
